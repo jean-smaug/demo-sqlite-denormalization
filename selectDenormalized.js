@@ -18,7 +18,7 @@ let start = performance.now()
 // })
 
 db.all(`
-    SELECT bars.id, name FROM bars, json_each(bars.wines_ids)
+    SELECT bars_denormalized.id, name FROM bars_denormalized, json_each(bars_denormalized.wines_ids)
     WHERE json_each.value IN (SELECT id FROM wines WHERE year > 2018);`,
     (err, bars) => {
         if(err) console.error(err)
