@@ -2,7 +2,7 @@ const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("db.sqlite");
 const faker = require('faker');
 
-const NUMBER_OF_BARS = 10
+const NUMBER_OF_BARS = 1000
 const NUMBER_OF_WINES = 1000
 
 // https://stackoverflow.com/questions/19269545/how-to-get-n-no-elements-randomly-from-an-array/38571132
@@ -25,8 +25,8 @@ db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS wines (
             id TEXT PRIMARY KEY,
-            name STRING,
-            country STRING,
+            name TEXT,
+            country TEXT,
             year NUMBER
         );
     `)
@@ -47,7 +47,8 @@ db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS bars_denormalized (
             id TEXT PRIMARY KEY,
-            name STRING,
+            name TEXT,
+            country TEXT,
             wines_ids JSON
         );
     `)
@@ -56,39 +57,41 @@ db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS bars_normalized (
             id TEXT PRIMARY KEY,
-            name STRING
+            name TEXT,
+            country TEXT
         );
     `)
 
     db.run('DROP TABLE IF EXISTS bars_wines')
     db.run(`
         CREATE TABLE IF NOT EXISTS bars_wines (
-            bar_id STRING,
-            wine_id STRING
+            bar_id TEXT,
+            wine_id TEXT
         );
     `)
 
-    db.all('SELECT id FROM wines', (err, rows) => {
+    db.all('SELECT DISTINCT id FROM wines', (err, rows) => {
         const ids = rows.map(item => item.id)
         Array(NUMBER_OF_BARS).fill().forEach(wine => {
             const bar = {
                 $id: faker.random.uuid(),
                 $name: faker.lorem.words(),
+                $country: faker.address.country(),
             }
 
-            const winesIds = getRandom(ids, Math.round(Math.random()*(NUMBER_OF_WINES/2)))
+            const winesIds = getRandom(ids, Math.round(Math.random()*(NUMBER_OF_WINES/4)))
 
             db.run(`
-                INSERT INTO bars_denormalized (id, name, wines_ids) 
-                VALUES ($id, $name, json($winesIds))
+                INSERT INTO bars_denormalized (id, name, country, wines_ids) 
+                VALUES ($id, $name, $country, json($winesIds))
             `, {
                 ...bar,
                 $winesIds: JSON.stringify(winesIds)
             })
 
             db.run(`
-                INSERT INTO bars_normalized (id, name) 
-                VALUES ($id, $name)
+                INSERT INTO bars_normalized (id, name, country) 
+                VALUES ($id, $name, $country)
             `, {
                 ...bar,
             })
