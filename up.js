@@ -2,8 +2,8 @@ const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 1000;
-const NUMBER_OF_WINES = 1000;
+const NUMBER_OF_BARS = 100;
+const NUMBER_OF_WINES = 100;
 
 // https://stackoverflow.com/questions/19269545/how-to-get-n-no-elements-randomly-from-an-array/38571132
 function getRandom(arr, n) {
@@ -20,8 +20,10 @@ function getRandom(arr, n) {
   return result;
 }
 
+const shouldDrop = process.env.DROP === "true";
+
 db.serialize(() => {
-  db.run("DROP TABLE IF EXISTS wines");
+  if (shouldDrop) db.run("DROP TABLE IF EXISTS wines");
   db.run(`
         CREATE TABLE IF NOT EXISTS wines (
             id TEXT PRIMARY KEY,
@@ -48,7 +50,7 @@ db.serialize(() => {
       );
     });
 
-  db.run("DROP TABLE IF EXISTS bars_denormalized");
+  if (shouldDrop) db.run("DROP TABLE IF EXISTS bars_denormalized");
   db.run(`
         CREATE TABLE IF NOT EXISTS bars_denormalized (
             id TEXT PRIMARY KEY,
@@ -58,7 +60,7 @@ db.serialize(() => {
         );
     `);
 
-  db.run("DROP TABLE IF EXISTS bars_normalized");
+  if (shouldDrop) db.run("DROP TABLE IF EXISTS bars_normalized");
   db.run(`
         CREATE TABLE IF NOT EXISTS bars_normalized (
             id TEXT PRIMARY KEY,
@@ -67,7 +69,7 @@ db.serialize(() => {
         );
     `);
 
-  db.run("DROP TABLE IF EXISTS bars_wines");
+  if (shouldDrop) db.run("DROP TABLE IF EXISTS bars_wines");
   db.run(`
         CREATE TABLE IF NOT EXISTS bars_wines (
             bar_id TEXT,
