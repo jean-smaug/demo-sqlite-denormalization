@@ -14,9 +14,13 @@ let start = performance.now()
 
 
 db.all(`
-    SELECT DISTINCT json_each.value AS id
-    FROM bars_denormalized, json_each(bars_denormalized.wines_ids)
-    WHERE bars_denormalized.country = 'Kuwait';
+    SELECT DISTINCT wines.id, wines.name
+    FROM wines
+    WHERE id IN (
+        SELECT DISTINCT json_each.value AS id
+        FROM bars_denormalized, json_each(bars_denormalized.wines_ids)
+        WHERE bars_denormalized.country = 'Kuwait'
+    );
     `,
     (err, bars) => {
         if(err) console.error(err)
