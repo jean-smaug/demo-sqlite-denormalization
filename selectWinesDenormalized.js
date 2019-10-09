@@ -9,7 +9,7 @@ let start = performance.now()
 // WHERE id IN (
 //     SELECT DISTINCT wines_ids
 //     FROM bars_denormalized
-//     WHERE country = 'spain'
+//     WHERE country
 // );
 
 
@@ -19,8 +19,8 @@ db.all(`
     WHERE id IN (
         SELECT DISTINCT json_each.value AS id
         FROM bars_denormalized, json_each(bars_denormalized.wines_ids)
-        WHERE bars_denormalized.country = 'Kuwait'
-    );
+        WHERE bars_denormalized.country = 'Spain'
+    ) AND country = 'France';
     `,
     (err, bars) => {
         if(err) console.error(err)
