@@ -2,8 +2,8 @@ const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 1000;
-const NUMBER_OF_WINES = 1000;
+const NUMBER_OF_BARS = 10000;
+const NUMBER_OF_WINES = 50000;
 
 // https://stackoverflow.com/questions/19269545/how-to-get-n-no-elements-randomly-from-an-array/38571132
 function getRandom(arr, n) {
@@ -22,6 +22,7 @@ function getRandom(arr, n) {
 
 const shouldDrop = process.env.DROP === "true";
 
+console.log('start wines')
 if (shouldDrop) db.prepare("DROP TABLE IF EXISTS wines").run();
 db.prepare(`
       CREATE TABLE IF NOT EXISTS wines (
@@ -34,7 +35,8 @@ db.prepare(`
 
 Array(NUMBER_OF_WINES)
   .fill()
-  .forEach(() => {
+  .forEach((_, index) => {
+    if(index % 1000 === 0) console.log(`Wines --> ${index}`)
     db.prepare(
       `
           INSERT INTO wines (id, name, country, year) 
@@ -48,7 +50,7 @@ Array(NUMBER_OF_WINES)
     });
   });
 
-if (shouldDrop) db.run("DROP TABLE IF EXISTS bars_denormalized");
+if (shouldDrop) db.prepare("DROP TABLE IF EXISTS bars_denormalized").run();
 db.prepare(`
       CREATE TABLE IF NOT EXISTS bars_denormalized (
           id TEXT PRIMARY KEY,
@@ -75,11 +77,14 @@ db.prepare(`
       );
   `).run();
 
+console.log('bars')
 const rows = db.prepare("SELECT DISTINCT id FROM wines").all()
 const ids = rows.map(item => item.id);
 Array(NUMBER_OF_BARS)
   .fill()
-  .forEach(wine => {
+  .forEach((_, index) => {
+    if(index % 1000 === 0) console.log(`Bars --> ${index}`)
+
     const bar = {
       id: faker.random.uuid(),
       name: faker.lorem.words(),
@@ -105,22 +110,20 @@ Array(NUMBER_OF_BARS)
       `
             INSERT INTO bars_normalized (id, name, country) 
             VALUES ($id, $name, $country)
-        `,
-      {
-        ...bar
-      }
-    );
+        `
+    ).run({
+      ...bar
+    });
 
     winesIds.forEach(wineId => {
       db.prepare(
         `
                 INSERT INTO bars_wines (bar_id, wine_id) 
                 VALUES ($barId, $wineId)
-            `,
-        {
-          barId: bar.$id,
-          wineId: wineId
-        }
-      );
+            `
+      ).run({
+        barId: bar.id,
+        wineId: wineId
+      });
     });
   });
