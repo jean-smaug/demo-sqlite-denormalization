@@ -6,21 +6,6 @@ const NUMBER_OF_BARS = 5000;
 const NUMBER_OF_WINES = 50000;
 const NUMBER_OF_WINES_PER_BARS = 1000;
 
-// https://stackoverflow.com/questions/19269545/how-to-get-n-no-elements-randomly-from-an-array/38571132
-function getRandom(arr, n) {
-  var result = new Array(n),
-    len = arr.length,
-    taken = new Array(len);
-  if (n > len)
-    throw new RangeError("getRandom: more elements taken than available");
-  while (n--) {
-    var x = Math.floor(Math.random() * len);
-    result[n] = arr[x in taken ? taken[x] : x];
-    taken[x] = --len in taken ? taken[len] : len;
-  }
-  return result;
-}
-
 const shouldDrop = process.env.DROP === "true";
 
 console.log('start wines')
@@ -79,8 +64,6 @@ db.prepare(`
   `).run();
 
 console.log('bars')
-// const rows = db.prepare("SELECT DISTINCT id FROM wines").all()
-// const ids = rows.map(item => item.id);
 Array(NUMBER_OF_BARS)
   .fill()
   .forEach((_, index) => {
@@ -91,11 +74,6 @@ Array(NUMBER_OF_BARS)
       name: faker.lorem.words(),
       country: faker.address.country()
     };
-
-    // const winesIds = getRandom(
-    //   ids,
-    //   20
-    // );
 
     const winesIds = db.prepare(`
     SELECT id FROM wines WHERE id IN (SELECT id FROM wines ORDER BY RANDOM() LIMIT ${NUMBER_OF_WINES_PER_BARS})
