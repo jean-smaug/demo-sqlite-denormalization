@@ -2,21 +2,21 @@ const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 100;
-const NUMBER_OF_WINES = 10000;
-const NUMBER_OF_WINES_PER_BARS = 20;
+const NUMBER_OF_BARS = 200;
+const NUMBER_OF_WINES = 400;
+const NUMBER_OF_WINES_PER_BARS = 10;
 
 const shouldDrop = process.env.DROP === "true";
 
 if(shouldDrop) {
-  console.log('=== TABLES DROP ===')
+  console.log('==> TABLES DROP')
   db.prepare("DROP TABLE IF EXISTS wines").run();
   db.prepare("DROP TABLE IF EXISTS bars_denormalized").run();
   db.prepare("DROP TABLE IF EXISTS bars_normalized").run();
   db.prepare("DROP TABLE IF EXISTS bars_wines").run();
 }
 
-console.log('=== TABLES CREATION ===')
+console.log('==> TABLES CREATION')
 db.prepare(`
   CREATE TABLE IF NOT EXISTS wines (
     id TEXT PRIMARY KEY,
@@ -50,7 +50,6 @@ db.prepare(`
   );
 `).run();
 
-console.log('=== DATA INSERTION ===')
 const winesStatement = db.prepare(`
   INSERT INTO wines (id, name, country, year) 
   VALUES ($id, $name, $country, $year)
@@ -72,8 +71,13 @@ const barsWinesStatement = db.prepare(`
 `)
 
 
-const insertMany = (statement) => db.transaction((rows) => {
-  for (const row of rows) statement.run(row);
+const insertMany = (statement) => () => db.transaction((rows) => {
+  const arrayLength = rows.length;
+  // console.log(statement)
+  console.log(`${arrayLength} elements`)
+  for (const [key, row] of rows) {
+    statement.run(row)
+  };
 });
 
 const wines = Array(NUMBER_OF_WINES)
@@ -86,8 +90,8 @@ const wines = Array(NUMBER_OF_WINES)
     })
   )
 
-console.log('=== WINES INSERTION ===')
-insertMany(winesStatement)(wines)
+console.log('==> WINES INSERTION', wines)
+console.log(insertMany(winesStatement)(wines))
 
 const bars = Array(NUMBER_OF_BARS)
   .fill()
@@ -100,19 +104,19 @@ const bars = Array(NUMBER_OF_BARS)
     `).all().map(wine => wine.id)
   }))
 
-console.log('=== BAR DENORMALIZED INSERTION ===')
-insertMany(barDenormalizedStatement)(bars.map(bar => ({...bar, winesIds: JSON.stringify(bar.winesIds)})))
+console.log('==> BAR DENORMALIZED INSERTION')
+// insertMany(barDenormalizedStatement)(bars.map(bar => ({...bar, winesIds: JSON.stringify(bar.winesIds)})))
 
-console.log('=== BAR NORMALIZED INSERTION ===')
-insertMany(barNormalizedStatement)(bars.map(bar => {
-  const barCopy = { ...bar };
-  delete barCopy.winesIds
-  return barCopy
-}));
+console.log('==> BAR NORMALIZED INSERTION')
+// insertMany(barNormalizedStatement)(bars.map(bar => {
+//   const barCopy = { ...bar };
+//   delete barCopy.winesIds
+//   return barCopy
+// }));
 
-console.log('=== WINES BARS INSERTION ===')
+console.log('==> WINES BARS INSERTION')
 const winesBars = bars.reduce((acc, bar) => {
   return [...acc, ...bar.winesIds.map((wineId) => ({ wineId, barId: bar.id }))]
 }, [])
 
-insertMany(barsWinesStatement)(winesBars);
+// insertMany(barsWinesStatement)(winesBars);
