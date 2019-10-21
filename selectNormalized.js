@@ -16,7 +16,7 @@ db.all(
   (err, bars) => {
     if (err) console.error(err);
 
-    console.log(bars);
+    console.log(bars.length);
 
     let end = performance.now();
     console.log(end - start);
