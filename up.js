@@ -2,111 +2,117 @@ const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 5000;
-const NUMBER_OF_WINES = 50000;
-const NUMBER_OF_WINES_PER_BARS = 1000;
+const NUMBER_OF_BARS = 100;
+const NUMBER_OF_WINES = 10000;
+const NUMBER_OF_WINES_PER_BARS = 20;
 
 const shouldDrop = process.env.DROP === "true";
 
-console.log('start wines')
-if (shouldDrop) db.prepare("DROP TABLE IF EXISTS wines").run();
-db.prepare(`
-      CREATE TABLE IF NOT EXISTS wines (
-          id TEXT PRIMARY KEY,
-          name TEXT,
-          country TEXT,
-          year NUMBER
-      );
-  `).run();
+if(shouldDrop) {
+  console.log('=== TABLES DROP ===')
+  db.prepare("DROP TABLE IF EXISTS wines").run();
+  db.prepare("DROP TABLE IF EXISTS bars_denormalized").run();
+  db.prepare("DROP TABLE IF EXISTS bars_normalized").run();
+  db.prepare("DROP TABLE IF EXISTS bars_wines").run();
+}
 
-Array(NUMBER_OF_WINES)
+console.log('=== TABLES CREATION ===')
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS wines (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    country TEXT,
+    year NUMBER
+  );
+`).run();
+  
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS bars_denormalized (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    country TEXT,
+    wines_ids JSON
+  );`
+).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS bars_normalized (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    country TEXT
+  );
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS bars_wines (
+    bar_id TEXT,
+    wine_id TEXT
+  );
+`).run();
+
+console.log('=== DATA INSERTION ===')
+const winesStatement = db.prepare(`
+  INSERT INTO wines (id, name, country, year) 
+  VALUES ($id, $name, $country, $year)
+`)
+
+const barDenormalizedStatement = db.prepare(`
+  INSERT INTO bars_denormalized (id, name, country, wines_ids) 
+  VALUES ($id, $name, $country, json($winesIds))
+`)
+
+const barNormalizedStatement = db.prepare(`
+  INSERT INTO bars_normalized (id, name, country) 
+  VALUES ($id, $name, $country)
+`)
+
+const barsWinesStatement = db.prepare(`
+  INSERT INTO bars_wines (bar_id, wine_id) 
+  VALUES ($barId, $wineId)
+`)
+
+
+const insertMany = (statement) => db.transaction((rows) => {
+  for (const row of rows) statement.run(row);
+});
+
+const wines = Array(NUMBER_OF_WINES)
   .fill()
-  .forEach((_, index) => {
-    if(index % 1000 === 0) console.log(`Wines --> ${index}`)
-    db.prepare(
-      `
-          INSERT INTO wines (id, name, country, year) 
-          VALUES ($id, $name, $country, $year)
-      `,
-    ).run({
+  .map(() => ({
       id: faker.random.uuid(),
       name: faker.lorem.words(),
       country: faker.address.country(),
       year: faker.date.past(50).getFullYear()
-    });
-  });
+    })
+  )
 
-if (shouldDrop) db.prepare("DROP TABLE IF EXISTS bars_denormalized").run();
-db.prepare(`
-      CREATE TABLE IF NOT EXISTS bars_denormalized (
-          id TEXT PRIMARY KEY,
-          name TEXT,
-          country TEXT,
-          wines_ids JSON
-      );
-  `).run();
+console.log('=== WINES INSERTION ===')
+insertMany(winesStatement)(wines)
 
-if (shouldDrop) db.prepare("DROP TABLE IF EXISTS bars_normalized").run();
-db.prepare(`
-      CREATE TABLE IF NOT EXISTS bars_normalized (
-          id TEXT PRIMARY KEY,
-          name TEXT,
-          country TEXT
-      );
-  `).run();
-
-if (shouldDrop) db.prepare("DROP TABLE IF EXISTS bars_wines").run();
-db.prepare(`
-      CREATE TABLE IF NOT EXISTS bars_wines (
-          bar_id TEXT,
-          wine_id TEXT
-      );
-  `).run();
-
-console.log('bars')
-Array(NUMBER_OF_BARS)
+const bars = Array(NUMBER_OF_BARS)
   .fill()
-  .forEach((_, index) => {
-    if(index % 1000 === 0) console.log(`Bars --> ${index}`)
-
-    const bar = {
-      id: faker.random.uuid(),
-      name: faker.lorem.words(),
-      country: faker.address.country()
-    };
-
-    const winesIds = db.prepare(`
-    SELECT id FROM wines WHERE id IN (SELECT id FROM wines ORDER BY RANDOM() LIMIT ${NUMBER_OF_WINES_PER_BARS})
+  .map(() => ({
+    id: faker.random.uuid(),
+    name: faker.lorem.words(),
+    country: faker.address.country(),
+    winesIds: db.prepare(`
+      SELECT id FROM wines WHERE id IN (SELECT id FROM wines ORDER BY RANDOM() LIMIT ${NUMBER_OF_WINES_PER_BARS})
     `).all().map(wine => wine.id)
+  }))
 
-    db.prepare(
-      `
-            INSERT INTO bars_denormalized (id, name, country, wines_ids) 
-            VALUES ($id, $name, $country, json($winesIds))
-        `
-    ).run({
-      ...bar,
-      winesIds: JSON.stringify(winesIds)
-    });
+console.log('=== BAR DENORMALIZED INSERTION ===')
+insertMany(barDenormalizedStatement)(bars.map(bar => ({...bar, winesIds: JSON.stringify(bar.winesIds)})))
 
-    db.prepare(
-      `
-            INSERT INTO bars_normalized (id, name, country) 
-            VALUES ($id, $name, $country)
-        `
-    ).run({
-      ...bar
-    });
+console.log('=== BAR NORMALIZED INSERTION ===')
+insertMany(barNormalizedStatement)(bars.map(bar => {
+  const barCopy = { ...bar };
+  delete barCopy.winesIds
+  return barCopy
+}));
 
-    winesIds.forEach(wineId => {
-      db.prepare(
-        `
-                INSERT INTO bars_wines (bar_id, wine_id) 
-                VALUES ($barId, $wineId)
-            `
-      ).run({
-        barId: bar.id,
-        wineId: wineId
-      });
-    });
-  });
+console.log('=== WINES BARS INSERTION ===')
+const winesBars = bars.reduce((acc, bar) => {
+  return [...acc, ...bar.winesIds.map((wineId) => ({ wineId, barId: bar.id }))]
+}, [])
+
+insertMany(barsWinesStatement)(winesBars);
