@@ -2,8 +2,9 @@ const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 10000;
+const NUMBER_OF_BARS = 5000;
 const NUMBER_OF_WINES = 50000;
+const NUMBER_OF_WINES_PER_BARS = 1000;
 
 // https://stackoverflow.com/questions/19269545/how-to-get-n-no-elements-randomly-from-an-array/38571132
 function getRandom(arr, n) {
@@ -78,8 +79,8 @@ db.prepare(`
   `).run();
 
 console.log('bars')
-const rows = db.prepare("SELECT DISTINCT id FROM wines").all()
-const ids = rows.map(item => item.id);
+// const rows = db.prepare("SELECT DISTINCT id FROM wines").all()
+// const ids = rows.map(item => item.id);
 Array(NUMBER_OF_BARS)
   .fill()
   .forEach((_, index) => {
@@ -91,10 +92,14 @@ Array(NUMBER_OF_BARS)
       country: faker.address.country()
     };
 
-    const winesIds = getRandom(
-      ids,
-      20
-    );
+    // const winesIds = getRandom(
+    //   ids,
+    //   20
+    // );
+
+    const winesIds = db.prepare(`
+    SELECT id FROM wines WHERE id IN (SELECT id FROM wines ORDER BY RANDOM() LIMIT ${NUMBER_OF_WINES_PER_BARS})
+    `).all().map(wine => wine.id)
 
     db.prepare(
       `
