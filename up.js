@@ -2,7 +2,7 @@ const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
 
-const NUMBER_OF_BARS = 10000;
+const NUMBER_OF_BARS = 1000;
 const NUMBER_OF_WINES = 50000;
 const NUMBER_OF_WINES_PER_BARS = 1000;
 
