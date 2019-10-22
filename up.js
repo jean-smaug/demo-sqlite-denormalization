@@ -1,6 +1,7 @@
 const Sqlite = require("better-sqlite3");
 const db = new Sqlite("db.sqlite");
 const faker = require("faker");
+const { performance } = require("perf_hooks");
 
 const NUMBER_OF_BARS = 500;
 const NUMBER_OF_WINES = 5000;
@@ -77,13 +78,15 @@ const barsWinesStatement = db.prepare(`
   VALUES ($barId, $wineId)
 `);
 
-const insertMany = statement =>
-  db.transaction(rows => {
-    console.log(`${rows.length} elements`);
-    for (const row of rows) {
-      statement.run(row);
-    }
-  });
+const insertMany = statement => db.transaction(rows => {
+  console.log(`${rows.length} elements`);
+  const start = performance.now()
+  for (const row of rows) {
+    statement.run(row);
+  }
+
+  console.log(`${Math.round(performance.now() - start)}ms`)
+});
 
 const wines = Array(NUMBER_OF_WINES)
   .fill()
